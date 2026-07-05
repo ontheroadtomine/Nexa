@@ -6,6 +6,7 @@ import { createDefaultToolRegistry } from './agent-core/default-tools';
 import { AgentLoop, requestChatCompletion } from './agent-core/loop';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const AGENT_LOOP_TIMEOUT_MS = 600_000;
 
 function expandHome(filePath: string): string {
   if (filePath === '~') return os.homedir();
@@ -93,7 +94,7 @@ export async function testLlmApi(config: LlmApiConfig): Promise<LlmApiTestResult
 export async function chatWithLlmApi(config: LlmApiConfig, prompt: string, cwd = process.cwd()): Promise<LlmApiChatResult> {
   const started = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180_000);
+  const timeout = setTimeout(() => controller.abort(), AGENT_LOOP_TIMEOUT_MS);
 
   try {
     const apiKey = resolveApiKey(config);
@@ -120,7 +121,7 @@ export async function chatWithLlmApi(config: LlmApiConfig, prompt: string, cwd =
       providerId: config.id,
       model: config.model,
       latencyMs: Date.now() - started,
-      error: error?.name === 'AbortError' ? 'Request timed out' : String(error?.message || error),
+      error: error?.name === 'AbortError' ? `Agent task timed out after ${Math.round(AGENT_LOOP_TIMEOUT_MS / 1000)} seconds` : String(error?.message || error),
     };
   } finally {
     clearTimeout(timeout);
@@ -135,7 +136,7 @@ export async function streamChatWithLlmApi(
 ): Promise<void> {
   const started = Date.now();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180_000);
+  const timeout = setTimeout(() => controller.abort(), AGENT_LOOP_TIMEOUT_MS);
 
   try {
     const apiKey = resolveApiKey(config);
@@ -150,7 +151,7 @@ export async function streamChatWithLlmApi(
     });
     emit({ type: 'final', content: result.content, latencyMs: Date.now() - started });
   } catch (error: any) {
-    emit({ type: 'error', error: error?.name === 'AbortError' ? 'Request timed out' : String(error?.message || error) });
+    emit({ type: 'error', error: error?.name === 'AbortError' ? `Agent task timed out after ${Math.round(AGENT_LOOP_TIMEOUT_MS / 1000)} seconds` : String(error?.message || error) });
   } finally {
     clearTimeout(timeout);
   }
